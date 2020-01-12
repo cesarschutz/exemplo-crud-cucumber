@@ -1,0 +1,82 @@
+trigger:
+  - master
+
+pool: 'AWS Pipelines'
+
+steps:
+
+  - task: DownloadBuildArtifacts@0
+    inputs:
+      buildType: 'specific'
+      project: 'd585a049-8df3-4c71-be1a-013e2b6424c7'
+      pipeline: '19'
+      buildVersionToDownload: 'latest'
+      downloadType: 'single'
+      artifactName: 'validate-integration-tests'
+      downloadPath: '$(System.DefaultWorkingDirectory)'
+
+  - task: Gradle@2
+    inputs:
+      gradleWrapperFile: 'gradlew'
+      tasks: 'addCredentials --key azureArtifactsGradleAccessToken --value $(AZURE_DEVOPS_ARTIFACTS_ACCESS_TOKEN)'
+      publishJUnitResults: false
+      javaHomeOption: 'JDKVersion'
+      sonarQubeRunAnalysis: false
+
+  - task: Gradle@2
+    inputs:
+      gradleWrapperFile: 'gradlew'
+      options: '-Pversion=$(Version).$(Build.BuildId)-SNAPSHOT'
+      tasks: 'build allureReport'
+      publishJUnitResults: true
+      testResultsFiles: '**/TEST-*.xml'
+      codeCoverageToolOption: 'JaCoCo'
+      codeCoverageFailIfEmpty: true
+      javaHomeOption: 'JDKVersion'
+      sonarQubeRunAnalysis: false
+
+  - task: S3Upload@1
+    inputs:
+      awsCredentials: 's3'
+      regionName: 'sa-east-1'
+      bucketName: 'cards-allure-reports'
+      sourceFolder: 'build/reports/allure/allure-reports'
+      globExpressions: '**'
+      targetFolder: 'allure-reports/$(Build.BuildNumber)'
+
+  - task: PythonScript@0
+    inputs:
+      scriptSource: 'filePath'
+      scriptPath: 'validate-integration-tests/validate-integration-tests/validate-integration-tests.py'
+      pythonInterpreter: '/usr/bin/python3'
+      workingDirectory: '$(System.DefaultWorkingDirectory)'
+
+  - task: Gradle@2
+    inputs:
+      gradleWrapperFile: 'gradlew'
+      options: '-Pversion=$(Version).$(Build.BuildId)-SNAPSHOT'
+      tasks: 'publish'
+      publishJUnitResults: false
+      javaHomeOption: 'JDKVersion'
+      sonarQubeRunAnalysis: false
+
+  - task: Docker@2
+    inputs:
+      repository: '651839557319.dkr.ecr.sa-east-1.amazonaws.com/cartoes/proposal'
+      command: 'buildAndPush'
+      Dockerfile: '**/Dockerfile'
+      tags: '$(Version).$(Build.BuildId)-SNAPSHOT'
+      addPipelineData: false
+
+  - task: CmdLine@2
+    inputs:
+      script: |
+        image_version='$(Version).$(Build.BuildId)-SNAPSHOT'
+        mkdir -p $(Pipeline.Workspace)/variables
+        echo "$image_version" > $(Pipeline.Workspace)/variables/image_version
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      PathtoPublish: '$(Pipeline.Workspace)/variables'
+      ArtifactName: 'service-version'
+      publishLocation: 'Container'

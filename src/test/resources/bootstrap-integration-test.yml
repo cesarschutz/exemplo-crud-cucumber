@@ -1,0 +1,20 @@
+spring:
+  cloud:
+    config:
+      enabled: false
+  data:
+    mongodb:
+      host: localhost
+      port: 0
+      database: proposal-test
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+
+feign:
+  client:
+    config:
+      default:
+        connectTimeout: 5000
+        readTimeout: 50000
+        loggerLevel: full
+

@@ -1,0 +1,22 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: proposal
+  cloud:
+    config:
+      label: master
+      enabled: true
+      uri: http://cloud-config-server.plataform.svc.cluster.local:8888
+  profiles:
+    include:
+#    include: bus, kafka
+
+springfox:
+  documentation:
+    swagger.v2.path: /swagger.json
+    info:
+      title: Proposal Microservice
+      description: Proposal Microservice documentation
+    base-package: br.com.unicred.cards.proposal
